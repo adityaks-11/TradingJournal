@@ -14,6 +14,8 @@ interface WithdrawalState {
     amount: number,
     remarks?: string
   ) => Promise<void>;
+  deleteWithdrawal: (withdrawalId: string) => Promise<void>;
+  deleteAllWithdrawals: () => Promise<void>;
 }
 
 export const useWithdrawalStore = create<WithdrawalState>((set, get) => ({
@@ -32,7 +34,7 @@ export const useWithdrawalStore = create<WithdrawalState>((set, get) => ({
       const { data, error } = await supabase
         .from('withdrawals')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as any)
         .order('date', { ascending: false });
 
       if (error) throw error;
@@ -124,6 +126,79 @@ export const useWithdrawalStore = create<WithdrawalState>((set, get) => ({
       }
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  deleteWithdrawal: async (withdrawalId) => {
+    try {
+      const user = useAuthStore.getState().user;
+
+      if (!user) throw new Error('User not authenticated');
+
+      set({ isLoading: true, error: null });
+
+      // Find the withdrawal to be deleted
+      const withdrawalToDelete = get().withdrawals.find(withdrawal => withdrawal.id === withdrawalId);
+
+      if (!withdrawalToDelete) {
+        throw new Error('Withdrawal not found');
+      }
+
+      // Delete the withdrawal from the database
+      const { error } = await supabase
+        .from('withdrawals')
+        .delete()
+        .eq('id', withdrawalId as any);
+
+      if (error) throw error;
+
+      // Calculate the new balance by adding the withdrawal amount back
+      const currentBalance = user.currentBalance;
+      const withdrawalAmount = withdrawalToDelete.amount;
+      const newBalance = currentBalance + withdrawalAmount;
+
+      // Update the user's balance
+      await useAuthStore.getState().updateBalance(newBalance);
+
+      // Update the local state
+      set({
+        withdrawals: get().withdrawals.filter(withdrawal => withdrawal.id !== withdrawalId)
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        set({ error: error.message });
+      } else {
+        set({ error: 'An unknown error occurred' });
+      }
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  deleteAllWithdrawals: async () => {
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) throw new Error('User not authenticated');
+      // Calculate total withdrawal amount
+      const totalWithdrawals = get().withdrawals.reduce((sum, w) => sum + w.amount, 0);
+      // Delete all withdrawals for this user
+      const { error } = await supabase
+        .from('withdrawals')
+        .delete()
+        .eq('user_id', user.id as any);
+      if (error) throw error;
+      // Add back all withdrawal amounts to current balance
+      await useAuthStore.getState().updateBalance(user.currentBalance + totalWithdrawals);
+      // Clear local withdrawals
+      set({ withdrawals: [] });
+    } catch (error) {
+      if (error instanceof Error) {
+        set({ error: error.message });
+        throw error;
+      } else {
+        set({ error: 'An unknown error occurred' });
+        throw new Error('An unknown error occurred');
+      }
     }
   },
 }));

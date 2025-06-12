@@ -16,6 +16,7 @@ interface AuthState {
 
   // Balance actions
   updateBalance: (newBalance: number) => Promise<void>;
+  updateStartingBalance: (newStartingBalance: number) => Promise<number>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -296,6 +297,109 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ error: error.message });
       } else {
         set({ error: 'An unknown error occurred' });
+      }
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateStartingBalance: async (newStartingBalance) => {
+    try {
+      const { user } = get();
+
+      // Check if user is authenticated
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get trades and withdrawals
+      const { trades } = await import('../store/tradeStore').then(m => m.useTradeStore.getState());
+      const { withdrawals } = await import('../store/withdrawalStore').then(m => m.useWithdrawalStore.getState());
+
+      // Ensure newStartingBalance is a valid number
+      let numericStartingBalance: number;
+
+      console.log('Raw starting balance value received:', newStartingBalance);
+      console.log('Type of newStartingBalance:', typeof newStartingBalance);
+
+      if (typeof newStartingBalance === 'number') {
+        numericStartingBalance = newStartingBalance;
+      } else if (typeof newStartingBalance === 'string') {
+        try {
+          const trimmedValue = newStartingBalance.trim();
+          if (!trimmedValue) {
+            throw new Error('Starting balance cannot be empty');
+          }
+          numericStartingBalance = parseFloat(trimmedValue);
+        } catch (e) {
+          throw new Error('Invalid starting balance format');
+        }
+      } else {
+        throw new Error('Invalid starting balance type');
+      }
+
+      console.log('Parsed starting balance:', numericStartingBalance);
+
+      // Validate the parsed value
+      if (isNaN(numericStartingBalance)) {
+        throw new Error('Invalid starting balance amount');
+      }
+
+      if (numericStartingBalance < 0) {
+        throw new Error('Starting balance cannot be negative');
+      }
+
+      if (numericStartingBalance > 1000000000) {
+        throw new Error('Starting balance amount is too large');
+      }
+
+      // Round to 2 decimal places to avoid floating point issues
+      numericStartingBalance = Math.round(numericStartingBalance * 100) / 100;
+
+      console.log('Updating starting balance to:', numericStartingBalance);
+      set({ isLoading: true, error: null });
+
+      // Calculate the new current balance
+      const totalTradeProfit = trades.reduce((sum, trade) => sum + trade.result, 0);
+      const totalWithdrawals = withdrawals.reduce((sum, withdrawal) => sum + withdrawal.amount, 0);
+      const newCurrentBalance = Math.round((numericStartingBalance + totalTradeProfit - totalWithdrawals) * 100) / 100;
+
+      console.log('New current balance calculated:', newCurrentBalance);
+      console.log('Based on: Starting Balance:', numericStartingBalance, 'Total Profit:', totalTradeProfit, 'Total Withdrawals:', totalWithdrawals);
+
+      // Update both starting_balance and current_balance in the database
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          starting_balance: numericStartingBalance,
+          current_balance: newCurrentBalance
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Supabase update error:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      // Update the user state
+      set({
+        user: {
+          ...user,
+          startingBalance: numericStartingBalance,
+          currentBalance: newCurrentBalance
+        }
+      });
+
+      return newCurrentBalance;
+    } catch (error) {
+      console.error('Update starting balance error:', error);
+      if (error instanceof Error) {
+        set({ error: error.message });
+        throw error;
+      } else {
+        const genericError = new Error('An unknown error occurred');
+        set({ error: genericError.message });
+        throw genericError;
       }
     } finally {
       set({ isLoading: false });

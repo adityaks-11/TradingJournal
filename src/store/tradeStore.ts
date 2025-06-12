@@ -22,6 +22,8 @@ interface TradeState {
     imageLink?: string,
     remarks?: string
   ) => Promise<void>;
+  deleteTrade: (tradeId: string) => Promise<void>;
+  deleteAllTrades: () => Promise<void>;
 }
 
 export const useTradeStore = create<TradeState>((set, get) => ({
@@ -161,6 +163,79 @@ export const useTradeStore = create<TradeState>((set, get) => ({
       }
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  deleteTrade: async (tradeId) => {
+    try {
+      const user = useAuthStore.getState().user;
+
+      if (!user) throw new Error('User not authenticated');
+
+      set({ isLoading: true, error: null });
+
+      // Find the trade to be deleted
+      const tradeToDelete = get().trades.find(trade => trade.id === tradeId);
+
+      if (!tradeToDelete) {
+        throw new Error('Trade not found');
+      }
+
+      // Delete the trade from the database
+      const { error } = await supabase
+        .from('trades')
+        .delete()
+        .eq('id', tradeId);
+
+      if (error) throw error;
+
+      // Calculate the new balance
+      // If it was a profitable trade (positive result), subtract that amount
+      // If it was a loss (negative result), add that amount back
+      const currentBalance = user.currentBalance;
+      const tradeResult = tradeToDelete.result;
+      const newBalance = currentBalance - tradeResult;
+
+      // Update the user's balance
+      await useAuthStore.getState().updateBalance(newBalance);
+
+      // Update the local state
+      set({
+        trades: get().trades.filter(trade => trade.id !== tradeId)
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        set({ error: error.message });
+      } else {
+        set({ error: 'An unknown error occurred' });
+      }
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  deleteAllTrades: async () => {
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) throw new Error('User not authenticated');
+      // Delete all trades for this user
+      const { error } = await supabase
+        .from('trades')
+        .delete()
+        .eq('user_id', user.id as any);
+      if (error) throw error;
+      // Reset balance to starting balance
+      await useAuthStore.getState().updateBalance(user.startingBalance);
+      // Clear local trades
+      set({ trades: [] });
+    } catch (error) {
+      if (error instanceof Error) {
+        set({ error: error.message });
+        throw error;
+      } else {
+        set({ error: 'An unknown error occurred' });
+        throw new Error('An unknown error occurred');
+      }
     }
   },
 }));
