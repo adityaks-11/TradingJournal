@@ -51,11 +51,6 @@ export const TradeForm: React.FC = () => {
   const pipValueMap: Record<string, number> = {
     'XAUUSD': 1,
     'GBPUSD': 10,
-    'BTCUSD': 1,
-    'ETHUSD': 1,
-    'NAS100': 1,
-    'S&P500': 1,
-    'US30': 1,
     'GBPJPY': 6.9,
     'AUDUSD': 10,
     'AUDJPY': 6.9,
@@ -65,7 +60,6 @@ export const TradeForm: React.FC = () => {
     'USDCAD': 7.3,
     'EURUSD': 10,
     'EURCHF': 12.20,
-    'GER30': 1,
   };
 
   // Auto-calculate TP Pips when SL or RR changes
@@ -188,11 +182,6 @@ export const TradeForm: React.FC = () => {
             <option value="">Select a currency pair</option>
             <option value="XAUUSD">XAUUSD</option>
             <option value="GBPUSD">GBPUSD</option>
-            <option value="BTCUSD">BTCUSD</option>
-            <option value="ETHUSD">ETHUSD</option>
-            <option value="NAS100">NAS100</option>
-            <option value="S&P500">S&P500</option>
-            <option value="US30">US30</option>
             <option value="GBPJPY">GBPJPY</option>
             <option value="AUDUSD">AUDUSD</option>
             <option value="AUDJPY">AUDJPY</option>
@@ -202,7 +191,6 @@ export const TradeForm: React.FC = () => {
             <option value="USDCAD">USDCAD</option>
             <option value="EURUSD">EURUSD</option>
             <option value="EURCHF">EURCHF</option>
-            <option value="GER30">GER30</option>
           </select>
           {errors.pair && (
             <p className="mt-1 text-sm text-red-400">{errors.pair.message}</p>

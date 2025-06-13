@@ -4,16 +4,16 @@ import { useTradeStore } from '../store/tradeStore';
 import { useWithdrawalStore } from '../store/withdrawalStore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
 import { format, parseISO, getDay } from 'date-fns';
-import { Pencil } from 'lucide-react';
+import { Pencil, Calendar } from 'lucide-react';
 import { EditStartingBalanceModal } from './EditStartingBalanceModal';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 // List of all pairs for dropdown (same as in TradeForm)
 const PAIRS = [
-  'XAUUSD', 'GBPUSD', 'BTCUSD', 'ETHUSD', 'NAS100', 'S&P500', 'US30',
+  'XAUUSD', 'GBPUSD',
   'GBPJPY', 'AUDUSD', 'AUDJPY', 'CADJPY', 'EURGBP', 'USDJPY', 'USDCAD',
-  'EURUSD', 'EURCHF', 'GER30'
+  'EURUSD', 'EURCHF'
 ];
 
 export const Dashboard: React.FC = () => {
@@ -36,6 +36,16 @@ export const Dashboard: React.FC = () => {
 
   // Modal state for expanded chart
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
+
+  // State for card filters
+  const [cardFilters, setCardFilters] = useState({
+    pnl: { mode: 'quick', quick: 'all', range: { start: '', end: '' } },
+    withdrawals: { mode: 'quick', quick: 'all', range: { start: '', end: '' } },
+    winrate: { mode: 'quick', quick: 'all', range: { start: '', end: '' } },
+  });
+
+  // State for global filter
+  const [globalFilter, setGlobalFilter] = useState({ mode: 'quick', quick: 'all', range: { start: '', end: '' } });
 
   useEffect(() => {
     fetchTrades();
@@ -101,6 +111,7 @@ export const Dashboard: React.FC = () => {
   const beTrades = filteredTrades.filter(t => t.outcome === 'BE').length;
   const winRate = totalTrades > 0 ? Math.round((winTrades / totalTrades) * 100) : 0;
   const totalProfit = filteredTrades.reduce((sum, trade) => sum + trade.result, 0);
+  const totalWithdrawals = filteredWithdrawals.reduce((sum, w) => sum + w.amount, 0);
   const outcomeData = [
     { name: 'Win', value: winTrades },
     { name: 'Loss', value: lossTrades },
@@ -261,7 +272,107 @@ export const Dashboard: React.FC = () => {
     });
   }, [filteredTrades]);
 
-  if (!user) return null;
+  // Helper to get date N days ago
+  const getDateNDaysAgo = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  };
+  // Helper to get date N months ago
+  const getDateNMonthsAgo = (n: number) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - n);
+    return d.toISOString().slice(0, 10);
+  };
+  // Helper to get date N years ago
+  const getDateNYearsAgo = (n: number) => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - n);
+    return d.toISOString().slice(0, 10);
+  };
+  // Helper to get quarter start
+  const getQuarterStart = () => {
+    const d = new Date();
+    const q = Math.floor(d.getMonth() / 3);
+    d.setMonth(q * 3, 1);
+    return d.toISOString().slice(0, 10);
+  };
+  const getCardDateRange = (filter: typeof globalFilter) => {
+    if (filter.mode === 'range') {
+      return filter.range;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    switch (filter.quick) {
+      case 'week':
+        return { start: getDateNDaysAgo(7), end: today };
+      case 'month':
+        return { start: getDateNMonthsAgo(1), end: today };
+      case 'quarter':
+        return { start: getQuarterStart(), end: today };
+      case 'year':
+        return { start: getDateNYearsAgo(1), end: today };
+      default:
+        return { start: '', end: '' };
+    }
+  };
+  const getFiltered = (items: any[], filter: typeof globalFilter) => {
+    const { start, end } = getCardDateRange(filter);
+    return items.filter(item => {
+      const date = new Date(item.date);
+      if (start && date < new Date(start)) return false;
+      if (end && date > new Date(end)) return false;
+      return true;
+    });
+  };
+  const pnlTrades = getFiltered(filteredTrades, globalFilter);
+  const pnlValue = pnlTrades.reduce((sum, trade) => sum + trade.result, 0);
+  const pnlCount = pnlTrades.length;
+  const withdrawalItems = getFiltered(filteredWithdrawals, globalFilter);
+  const withdrawalValue = withdrawalItems.reduce((sum, w) => sum + w.amount, 0);
+  const winrateTrades = getFiltered(filteredTrades, globalFilter);
+  const winrateTotal = winrateTrades.length;
+  const winrateWins = winrateTrades.filter(t => t.outcome === 'win').length;
+  const winrateLosses = winrateTrades.filter(t => t.outcome === 'loss').length;
+  const winrateBE = winrateTrades.filter(t => t.outcome === 'BE').length;
+  const winratePercent = winrateTotal > 0 ? Math.round((winrateWins / winrateTotal) * 100) : 0;
+
+  // UI for global selectors
+  const renderGlobalSelectors = () => (
+    <div className="flex flex-row flex-wrap items-center gap-6 mb-4">
+      <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Trading Dashboard</h2>
+      <div className="flex flex-row items-center gap-4 ml-4">
+        <div className="flex items-center gap-2">
+          <input type="radio" id="quick-radio-global" name="date-mode-global" checked={globalFilter.mode === 'quick'} onChange={() => setGlobalFilter(f => ({ ...f, mode: 'quick' }))} />
+          <label htmlFor="quick-radio-global" className="text-xs text-slate-700 dark:text-slate-200">Quick Range</label>
+          <select value={globalFilter.quick} onChange={e => setGlobalFilter(f => ({ ...f, quick: e.target.value }))} disabled={globalFilter.mode !== 'quick'}
+            className="ml-1 px-1 py-0.5 text-xs border rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors">
+            <option value="all">All Time</option>
+            <option value="week">1 Week</option>
+            <option value="month">1 Month</option>
+            <option value="quarter">1 Quarter</option>
+            <option value="year">1 Year</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="radio" id="range-radio-global" name="date-mode-global" checked={globalFilter.mode === 'range'} onChange={() => setGlobalFilter(f => ({ ...f, mode: 'range' }))} />
+          <label htmlFor="range-radio-global" className="text-xs text-slate-700 dark:text-slate-200">Date Range</label>
+          {globalFilter.mode === 'range' && (
+            <div className="flex items-center gap-1 ml-1">
+              <span className="flex items-center gap-1">
+                <Calendar size={14} className="text-slate-400" />
+                <input type="date" value={globalFilter.range.start} onChange={e => setGlobalFilter(f => ({ ...f, range: { ...f.range, start: e.target.value } }))} className="px-1 py-0.5 text-xs border rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors" />
+              </span>
+              <span className="mx-1">to</span>
+              <span className="flex items-center gap-1">
+                <Calendar size={14} className="text-slate-400" />
+                <input type="date" value={globalFilter.range.end} onChange={e => setGlobalFilter(f => ({ ...f, range: { ...f.range, end: e.target.value } }))} className="px-1 py-0.5 text-xs border rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors" />
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   // Helper: Render selectors for modal
   const renderSelectors = () => (
@@ -332,6 +443,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {renderGlobalSelectors()}
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Current Balance */}
@@ -356,44 +468,32 @@ export const Dashboard: React.FC = () => {
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
           <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Total P&L</h3>
           <p className={`text-2xl font-bold ${
-            totalProfit > 0
+            pnlValue > 0
               ? 'text-green-600 dark:text-green-400'
-              : totalProfit < 0
+              : pnlValue < 0
                 ? 'text-red-600 dark:text-red-400'
                 : 'text-slate-700 dark:text-slate-200'
           }`}>
-            {totalProfit > 0 ? '+' : ''}{totalProfit.toFixed(2)}
+            {pnlValue > 0 ? '+' : ''}{pnlValue.toFixed(2)}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Across {totalTrades} trades
+            Across {pnlCount} trades
           </p>
+        </div>
+
+        {/* Total Withdrawals */}
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Total Withdrawals</h3>
+          <p className="text-2xl font-bold text-red-600 dark:text-red-400">-{withdrawalValue.toFixed(2)}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Till date</p>
         </div>
 
         {/* Win Rate */}
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
           <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Win Rate</h3>
-          <p className="text-2xl font-bold text-slate-700 dark:text-slate-200">{winRate}%</p>
+          <p className="text-2xl font-bold text-slate-700 dark:text-slate-200">{winratePercent}%</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {winTrades} wins, {lossTrades} losses, {beTrades} BE
-          </p>
-        </div>
-
-        {/* Average Trade */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Avg. Trade Result</h3>
-          <p className={`text-2xl font-bold ${
-            totalTrades > 0 && totalProfit / totalTrades > 0
-              ? 'text-green-600 dark:text-green-400'
-              : totalTrades > 0 && totalProfit / totalTrades < 0
-                ? 'text-red-600 dark:text-red-400'
-                : 'text-slate-700 dark:text-slate-200'
-          }`}>
-            {totalTrades > 0
-              ? (totalProfit / totalTrades > 0 ? '+' : '') + (totalProfit / totalTrades).toFixed(2)
-              : '$0.00'}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Per completed trade
+            {winrateWins} wins, {winrateLosses} losses, {winrateBE} BE
           </p>
         </div>
       </div>
@@ -951,6 +1051,13 @@ export const Dashboard: React.FC = () => {
           </ResponsiveContainer>
         </div>
       </ChartModal>
+
+      {/* Edit Starting Balance Modal */}
+      <EditStartingBalanceModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        currentStartingBalance={user.startingBalance}
+      />
     </div>
   );
 };

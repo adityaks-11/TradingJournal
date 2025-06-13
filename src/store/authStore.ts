@@ -25,6 +25,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   error: null,
   signupSuccess: false,
 
+  signup: async (email, password, startingBalance) => {
+    try {
+      set({ isLoading: true, error: null, signupSuccess: false });
+
+      // Only sign up the user, do not create profile yet
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+
+      // If user is created, prompt for email confirmation
+      if (!authData.user?.id) {
+        throw new Error('Failed to create user account');
+      }
+
+      // Do not create profile yet; wait for email confirmation and login
+      set({ signupSuccess: true });
+    } catch (error) {
+      if (error instanceof Error) {
+        set({ error: error.message });
+      } else {
+        set({ error: 'An unknown error occurred' });
+      }
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   login: async (email, password) => {
     try {
       set({ isLoading: true, error: null });
@@ -72,52 +102,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Small delay to ensure session is properly set
       await new Promise(resolve => setTimeout(resolve, 500));
 
+      // Check if profile exists for this user
+      const { data: profile, error: profileFetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileFetchError && profileFetchError.code !== 'PGRST116') { // PGRST116: No rows found
+        throw profileFetchError;
+      }
+
+      if (!profile) {
+        // If no profile, create it now
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            email,
+            starting_balance: 0, // or prompt user for this value after login
+            current_balance: 0,
+          })
+          .select()
+          .single();
+        if (profileError) {
+          throw new Error('Failed to create user profile. Please try again.');
+        }
+      }
+
       // Get user data
       await get().getUser();
     } catch (error) {
       console.error('Login catch block:', error);
-      if (error instanceof Error) {
-        set({ error: error.message });
-      } else {
-        set({ error: 'An unknown error occurred' });
-      }
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  signup: async (email, password, startingBalance) => {
-    try {
-      set({ isLoading: true, error: null, signupSuccess: false });
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (authError) throw authError;
-
-      if (!authData.user?.id) {
-        throw new Error('Failed to create user account');
-      }
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email,
-          starting_balance: startingBalance,
-          current_balance: startingBalance,
-        })
-        .select()
-        .single();
-
-      if (profileError) {
-        throw new Error('Failed to create user profile. Please try again.');
-      }
-
-      set({ signupSuccess: true });
-    } catch (error) {
       if (error instanceof Error) {
         set({ error: error.message });
       } else {
