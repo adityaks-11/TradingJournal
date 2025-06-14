@@ -16,7 +16,7 @@ interface AuthState {
 
   // Balance actions
   updateBalance: (newBalance: number) => Promise<void>;
-  updateStartingBalance: (newStartingBalance: number) => Promise<number>;
+  updateStartingBalance: (newStartingBalance: number, trades: import('../types').Trade[], withdrawals: import('../types').Withdrawal[]) => Promise<number>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -319,7 +319,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  updateStartingBalance: async (newStartingBalance) => {
+  updateStartingBalance: async (
+    newStartingBalance: number | string,
+    trades: import('../types').Trade[],
+    withdrawals: import('../types').Withdrawal[]
+  ): Promise<number> => {
     try {
       const { user } = get();
 
@@ -327,10 +331,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!user) {
         throw new Error('User not authenticated');
       }
-
-      // Get trades and withdrawals
-      const { trades } = await import('../store/tradeStore').then(m => m.useTradeStore.getState());
-      const { withdrawals } = await import('../store/withdrawalStore').then(m => m.useWithdrawalStore.getState());
 
       // Ensure newStartingBalance is a valid number
       let numericStartingBalance: number;
@@ -387,10 +387,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { error } = await supabase
         .from('profiles')
         .update({
-          starting_balance: numericStartingBalance,
-          current_balance: newCurrentBalance
-        })
-        .eq('id', user.id);
+          starting_balance: numericStartingBalance as number,
+          current_balance: newCurrentBalance as number
+        } as import('../types/supabase').Database['public']['Tables']['profiles']['Update'])
+        .eq('id', user.id as string);
 
       if (error) {
         console.error('Supabase update error:', error);

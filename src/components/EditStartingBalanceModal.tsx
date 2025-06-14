@@ -18,8 +18,8 @@ export const EditStartingBalanceModal: React.FC<EditStartingBalanceModalProps> =
   currentStartingBalance
 }) => {
   const { updateStartingBalance, isLoading } = useAuthStore();
-  const { fetchTrades } = useTradeStore();
-  const { fetchWithdrawals } = useWithdrawalStore();
+  const { trades, fetchTrades } = useTradeStore();
+  const { withdrawals, fetchWithdrawals } = useWithdrawalStore();
   
   // State for the modal
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -112,12 +112,10 @@ export const EditStartingBalanceModal: React.FC<EditStartingBalanceModalProps> =
   const handleConfirmEdit = async () => {
     try {
       console.log('Confirming edit with balance value:', newBalanceValue);
-      
       // Round to 2 decimal places
       const roundedValue = Math.round(newBalanceValue * 100) / 100;
-      
       // Update the starting balance
-      const newCurrentBalance = await updateStartingBalance(roundedValue);
+      const newCurrentBalance = await updateStartingBalance(roundedValue, trades, withdrawals);
       
       // Close dialogs
       setIsConfirmDialogOpen(false);
