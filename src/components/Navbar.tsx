@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { TrendingUp, LayoutDashboard, ListOrdered, Wallet, LogOut, Menu, X } from 'lucide-react';
+import { TrendingUp, LayoutDashboard, ListOrdered, Wallet, LogOut, Menu, X, Calendar } from 'lucide-react';
 import { ThemeToggle } from './ui/ThemeToggle';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 
@@ -54,6 +54,13 @@ export const Navbar: React.FC = () => {
             >
               <Wallet className="h-4 w-4" />
               <span>Withdraw</span>
+            </Link>
+            <Link
+              to="/calendar"
+              className="flex items-center gap-2 text-slate-600 hover:text-teal-600 dark:text-slate-300 dark:hover:text-teal-400 transition-colors"
+            >
+              <Calendar className="h-4 w-4" />
+              <span className="align-middle">Calendar</span>
             </Link>
 
             <div className="h-6 w-px bg-slate-300 dark:bg-slate-700" />
@@ -132,6 +139,14 @@ export const Navbar: React.FC = () => {
             >
               <Wallet className="h-5 w-5 text-teal-600 dark:text-teal-500" />
               <span>Withdraw</span>
+            </Link>
+            <Link
+              to="/calendar"
+              className="flex items-center space-x-2 p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md text-slate-700 dark:text-slate-300"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <Calendar className="h-5 w-5 text-teal-600 dark:text-teal-500" />
+              <span>Calendar</span>
             </Link>
 
             <div className="border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">

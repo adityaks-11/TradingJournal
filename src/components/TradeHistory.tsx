@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useTradeStore } from '../store/tradeStore';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { TrendingUp, TrendingDown, ExternalLink, Trash2, ArrowDown, ArrowUp } from 'lucide-react';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { Toast, ToastType } from './ui/Toast';
 import { useAuthStore } from '../store/authStore';
 import { saveAs } from 'file-saver';
+import { Modal } from './ui/Modal';
 
 export const TradeHistory: React.FC = () => {
   const { trades, fetchTrades, deleteTrade, isLoading, error, deleteAllTrades } = useTradeStore();
@@ -28,6 +29,15 @@ export const TradeHistory: React.FC = () => {
   const [sortBy, setSortBy] = useState<'date' | 'result'>('date');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
+  // Filter state
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedPair, setSelectedPair] = useState('all');
+
+  // Export dialog state
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportMonth, setExportMonth] = useState(selectedMonth);
+  const [exportPair, setExportPair] = useState(selectedPair);
+
   useEffect(() => {
     fetchTrades();
   }, [fetchTrades]);
@@ -48,6 +58,16 @@ export const TradeHistory: React.FC = () => {
       return sortOrder === 'desc' ? b.result - a.result : a.result - b.result;
     }
     return 0;
+  });
+
+  // Get all unique months from trades
+  const months = Array.from(new Set(trades.map(trade => trade.date.slice(0, 7)))).sort().reverse();
+
+  // Filter trades by month and pair
+  const filteredTrades = sortedTrades.filter(trade => {
+    const monthMatch = selectedMonth === 'all' || trade.date.startsWith(selectedMonth);
+    const pairMatch = selectedPair === 'all' || trade.pair === selectedPair;
+    return monthMatch && pairMatch;
   });
 
   const handleDeleteClick = (tradeId: string) => {
@@ -102,13 +122,29 @@ export const TradeHistory: React.FC = () => {
     }
   };
 
-  // Export trades to CSV
+  // Export trades to CSV (filtered by exportMonth/exportPair)
   const handleExportCSV = () => {
-    if (!trades.length) return;
+    setExportMonth(selectedMonth);
+    setExportPair(selectedPair);
+    setIsExportDialogOpen(true);
+  };
+
+  const doExportCSV = () => {
+    // Filter trades for export
+    const tradesToExport = sortedTrades.filter(trade => {
+      const monthMatch = exportMonth === 'all' || trade.date.startsWith(exportMonth);
+      const pairMatch = exportPair === 'all' || trade.pair === exportPair;
+      return monthMatch && pairMatch;
+    });
+    if (!tradesToExport.length) {
+      setToast({ type: 'info', message: 'No trades to export for selected filters.', isVisible: true });
+      setIsExportDialogOpen(false);
+      return;
+    }
     const headers = [
       'Date', 'Pair', 'Direction', 'SL Pips', 'TP Pips', 'RR', 'Outcome', 'Result', 'Balance After', 'Image Link', 'Remarks'
     ];
-    const rows = trades.map(trade => [
+    const rows = tradesToExport.map(trade => [
       trade.date,
       trade.pair,
       trade.direction,
@@ -125,7 +161,16 @@ export const TradeHistory: React.FC = () => {
       .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
       .join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `trade_history_${new Date().toISOString().slice(0,10)}.csv`);
+    // Filename logic
+    let monthLabel = 'AllTime';
+    if (exportMonth !== 'all') {
+      try {
+        monthLabel = format(parseISO(exportMonth + '-01'), 'MMMM_yyyy');
+      } catch { monthLabel = exportMonth; }
+    }
+    let pairLabel = exportPair === 'all' ? 'AllPairs' : exportPair;
+    saveAs(blob, `trade_history_${monthLabel}_${pairLabel}.csv`);
+    setIsExportDialogOpen(false);
   };
 
   const closeToast = () => {
@@ -157,12 +202,40 @@ export const TradeHistory: React.FC = () => {
     );
   }
 
+  // List of all pairs for dropdown
+  const PAIRS = [
+    'all',
+    'XAUUSD', 'GBPUSD',
+    'GBPJPY', 'AUDUSD', 'AUDJPY', 'CADJPY', 'EURGBP', 'USDJPY', 'USDCAD',
+    'EURUSD', 'EURCHF'
+  ];
+
   return (
     <>
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden transition-colors">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Trading History</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-center">
+            <select
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}
+              className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">All Time</option>
+              {months.map(month => (
+                <option key={month} value={month}>{format(parseISO(month + '-01'), 'MMMM yyyy')}</option>
+              ))}
+            </select>
+            <select
+              value={selectedPair}
+              onChange={e => setSelectedPair(e.target.value)}
+              className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">All Pairs</option>
+              {PAIRS.filter(p => p !== 'all').map(pair => (
+                <option key={pair} value={pair}>{pair}</option>
+              ))}
+            </select>
             <button
               className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md font-medium transition-colors"
               onClick={handleExportCSV}
@@ -226,7 +299,7 @@ export const TradeHistory: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {sortedTrades.map((trade) => (
+              {filteredTrades.map((trade) => (
                 <tr key={trade.id} className="hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 transition-colors">
                   <td className="px-4 py-3 text-sm">{format(parseISO(trade.date), 'MMM dd, yyyy')}</td>
                   <td className="px-4 py-3 text-sm">{trade.pair}</td>
@@ -336,6 +409,42 @@ export const TradeHistory: React.FC = () => {
         isVisible={toast.isVisible}
         onClose={closeToast}
       />
+
+      {/* Export Dialog */}
+      <Modal isOpen={isExportDialogOpen} onClose={() => setIsExportDialogOpen(false)} title="Export to CSV" size="sm">
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Month</label>
+            <select
+              value={exportMonth}
+              onChange={e => setExportMonth(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+            >
+              <option value="all">All Time</option>
+              {months.map(month => (
+                <option key={month} value={month}>{format(parseISO(month + '-01'), 'MMMM yyyy')}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Pair</label>
+            <select
+              value={exportPair}
+              onChange={e => setExportPair(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+            >
+              <option value="all">All Pairs</option>
+              {PAIRS.filter(p => p !== 'all').map(pair => (
+                <option key={pair} value={pair}>{pair}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <button className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-md" onClick={() => setIsExportDialogOpen(false)}>Cancel</button>
+            <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md font-medium" onClick={doExportCSV}>Export</button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 };

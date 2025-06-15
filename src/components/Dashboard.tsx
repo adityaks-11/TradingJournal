@@ -111,6 +111,7 @@ export const Dashboard: React.FC = () => {
   const beTrades = filteredTrades.filter(t => t.outcome === 'BE').length;
   const winRate = totalTrades > 0 ? Math.round((winTrades / totalTrades) * 100) : 0;
   const totalProfit = filteredTrades.reduce((sum, trade) => sum + trade.result, 0);
+  const roiPercent = user && user.startingBalance ? ((totalProfit / user.startingBalance) * 100).toFixed(2) : '0.00';
   const totalWithdrawals = filteredWithdrawals.reduce((sum, w) => sum + w.amount, 0);
   const outcomeData = [
     { name: 'Win', value: winTrades },
@@ -446,54 +447,42 @@ export const Dashboard: React.FC = () => {
       {renderGlobalSelectors()}
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Current Balance */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+        {/* Current Balance Card (first) */}
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-xl shadow-lg p-6 flex flex-col items-center border border-blue-100 dark:border-blue-700 transition-colors">
           <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Current Balance</h3>
-          <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">${user.currentBalance.toFixed(2)}</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Started with ${user.startingBalance.toFixed(2)}
-            </p>
-            <button
-              onClick={handleOpenEditModal}
-              className="text-xs text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300 flex items-center gap-1 transition-colors"
-            >
-              <Pencil size={12} />
-              Edit
-            </button>
+          <p className="text-3xl font-extrabold text-teal-600 dark:text-teal-400">${user.currentBalance.toFixed(2)}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Started with ${user.startingBalance.toFixed(2)}</p>
+        </div>
+        {/* Total P&L Card (second) */}
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-xl shadow-lg p-6 flex flex-col items-center border border-slate-200 dark:border-slate-700 transition-colors">
+          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Total P&amp;L</h3>
+          <p className={`text-3xl font-extrabold ${pnlValue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{pnlValue >= 0 ? '+' : ''}{pnlValue.toFixed(2)}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Across {pnlCount} trades</p>
+        </div>
+        {/* Win Rate Card (third) */}
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-xl shadow-lg p-6 flex flex-col items-center border border-teal-100 dark:border-teal-700 transition-colors">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-teal-100 dark:bg-teal-900">
+              <svg className="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" /></svg>
+            </span>
+            <span className="text-base font-semibold text-teal-700 dark:text-teal-300">Win Rate</span>
           </div>
-        </div>
-
-        {/* Total Profit/Loss */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Total P&L</h3>
-          <p className={`text-2xl font-bold ${
-            pnlValue > 0
-              ? 'text-green-600 dark:text-green-400'
-              : pnlValue < 0
-                ? 'text-red-600 dark:text-red-400'
-                : 'text-slate-700 dark:text-slate-200'
-          }`}>
-            {pnlValue > 0 ? '+' : ''}{pnlValue.toFixed(2)}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Across {pnlCount} trades
+          <div className="text-3xl font-extrabold text-teal-600 dark:text-teal-400 mb-1">{winRate}%</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+            {winTrades} wins, {lossTrades} losses, {beTrades} BE
           </p>
         </div>
-
-        {/* Total Withdrawals */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Total Withdrawals</h3>
-          <p className="text-2xl font-bold text-red-600 dark:text-red-400">-{withdrawalValue.toFixed(2)}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Till date</p>
-        </div>
-
-        {/* Win Rate */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
-          <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Win Rate</h3>
-          <p className="text-2xl font-bold text-slate-700 dark:text-slate-200">{winratePercent}%</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {winrateWins} wins, {winrateLosses} losses, {winrateBE} BE
+        {/* ROI Card (last) */}
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-xl shadow-lg p-6 flex flex-col items-center border border-green-100 dark:border-green-700 transition-colors">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 dark:bg-green-900">
+              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 20V4m0 0l-6 6m6-6l6 6" /></svg>
+            </span>
+            <span className="text-base font-semibold text-green-700 dark:text-green-300">ROI</span>
+          </div>
+          <div className={`text-3xl font-extrabold ${parseFloat(roiPercent) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} mb-1`}>{roiPercent}%</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+            vs Starting Balance
           </p>
         </div>
       </div>

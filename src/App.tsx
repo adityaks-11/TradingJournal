@@ -4,6 +4,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TradesPage } from './pages/TradesPage';
 import { WithdrawPage } from './pages/WithdrawPage';
+import { CalendarPage } from './pages/CalendarPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
@@ -53,6 +54,15 @@ function App() {
           element={
             <ProtectedRoute>
               <WithdrawPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <CalendarPage />
             </ProtectedRoute>
           }
         />
