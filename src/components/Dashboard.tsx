@@ -34,6 +34,9 @@ export const Dashboard: React.FC = () => {
   // Add state for selectedPair
   const [selectedPair, setSelectedPair] = useState<string>('all');
 
+  // Add state for selectedTimeframe
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('all');
+
   // Modal state for expanded chart
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
 
@@ -62,7 +65,7 @@ export const Dashboard: React.FC = () => {
       // Create balance history
       const history = sortedTrades.map(trade => ({
         date: format(parseISO(trade.date), 'MMM dd'),
-        balance: trade.balanceAfterTrade
+        balance: user.startingBalance + sortedTrades.slice(0, sortedTrades.indexOf(trade) + 1).reduce((sum, t) => sum + t.result, 0)
       }));
 
       // Add starting point
@@ -77,6 +80,20 @@ export const Dashboard: React.FC = () => {
     }
   }, [user, trades]);
 
+  // Get unique pairs from trades for selector
+  const allPairs = React.useMemo(() => {
+    const pairs = Array.from(new Set(trades.map(t => t.pair)));
+    pairs.sort();
+    return ['all', ...pairs];
+  }, [trades]);
+
+  // Get unique timeframes from trades
+  const allTimeframes = React.useMemo(() => {
+    const tfs = Array.from(new Set(trades.map(t => t.timeframe)));
+    tfs.sort();
+    return ['all', ...tfs];
+  }, [trades]);
+
   // Helper to filter by date range
   const isWithinRange = (dateStr: string) => {
     if (!dateRange.start && !dateRange.end) return true;
@@ -88,14 +105,15 @@ export const Dashboard: React.FC = () => {
     return true;
   };
 
-  // Filter trades and withdrawals by date and selected pair
+  // Filter trades and withdrawals by date, pair, and timeframe
   const filteredTrades = React.useMemo(() => {
     return trades.filter(trade => {
       const inDateRange = isWithinRange(trade.date);
       const inPair = selectedPair === 'all' ? true : trade.pair === selectedPair;
-      return inDateRange && inPair;
+      const inTimeframe = selectedTimeframe === 'all' ? true : trade.timeframe === selectedTimeframe;
+      return inDateRange && inPair && inTimeframe;
     });
-  }, [trades, selectedPair, dateRange]);
+  }, [trades, selectedPair, selectedTimeframe, dateRange]);
 
   const filteredWithdrawals = React.useMemo(() => {
     return withdrawals.filter(w => {
@@ -178,13 +196,6 @@ export const Dashboard: React.FC = () => {
       { name: 'Short', value: shortCount },
     ].filter(item => item.value > 0);
   }, [filteredTrades]);
-
-  // Get unique pairs from trades for selector
-  const allPairs = React.useMemo(() => {
-    const pairs = Array.from(new Set(trades.map(t => t.pair)));
-    pairs.sort();
-    return ['all', ...pairs];
-  }, [trades]);
 
   // Compute win rate by pair for all trades in date range (not filtered by selectedPair)
   const winRateByPair = React.useMemo(() => {
@@ -488,7 +499,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Recent Activity - Now at the top with full width */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors">
         <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Recent Activity</h3>
         <div className="space-y-4 max-h-96 overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <style>{`
@@ -534,37 +545,34 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Date and Pair Selector Row */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
-        {/* Date Range Selector (left, stays where it is) */}
-        <div className="flex-shrink-0">
-          {/* Date Range Selector */}
-          <div className="flex flex-col md:flex-row items-center gap-4 my-4">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Date Range:</label>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))}
-              className="border rounded px-2 py-1 dark:bg-slate-700 dark:text-slate-100"
-              max={dateRange.end || undefined}
-            />
-            <span className="mx-2 text-slate-500 dark:text-slate-400">to</span>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))}
-              className="border rounded px-2 py-1 dark:bg-slate-700 dark:text-slate-100"
-              min={dateRange.start || undefined}
-            />
-            {(dateRange.start || dateRange.end) && (
-              <button
-                className="ml-2 text-xs text-red-500 hover:underline"
-                onClick={() => setDateRange({ start: '', end: '' })}
-              >
-                Clear
-              </button>
-            )}
-          </div>
+      {/* Charts Filter Row */}
+      <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-center mb-6">
+        {/* Date Range Picker (existing) */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Date Range:</label>
+          <input
+            type="date"
+            value={dateRange.start}
+            onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))}
+            className="border rounded px-2 py-1 dark:bg-slate-700 dark:text-slate-100"
+            max={dateRange.end || undefined}
+          />
+          <span className="mx-2 text-slate-500 dark:text-slate-400">to</span>
+          <input
+            type="date"
+            value={dateRange.end}
+            onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))}
+            className="border rounded px-2 py-1 dark:bg-slate-700 dark:text-slate-100"
+            min={dateRange.start || undefined}
+          />
+          {(dateRange.start || dateRange.end) && (
+            <button
+              className="ml-2 text-xs text-red-500 hover:underline"
+              onClick={() => setDateRange({ start: '', end: '' })}
+            >
+              Clear
+            </button>
+          )}
         </div>
 
         {/* Pair Selector (right) */}
@@ -582,12 +590,28 @@ export const Dashboard: React.FC = () => {
             ))}
           </select>
         </div>
+
+        {/* Timeframe Selector (new) */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="timeframeSelector" className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Timeframe</label>
+          <select
+            id="timeframeSelector"
+            value={selectedTimeframe}
+            onChange={e => setSelectedTimeframe(e.target.value)}
+            className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            <option value="all">All Timeframes</option>
+            {allTimeframes.filter(tf => tf !== 'all').map(tf => (
+              <option key={tf} value={tf}>{tf}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Pie Charts Row: Trade Outcomes & Trades by Direction */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Trade Outcomes Pie Chart */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors cursor-pointer" onClick={() => setExpandedChart('tradeOutcomes')}>
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors cursor-pointer" onClick={() => setExpandedChart('tradeOutcomes')}>
           <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Trade Outcomes</h3>
           {outcomeData.length > 0 ? (
             <div className="h-72">
@@ -619,7 +643,7 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
         {/* Trades by Direction Pie Chart */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors cursor-pointer" onClick={() => setExpandedChart('tradesByDirection')}>
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors cursor-pointer" onClick={() => setExpandedChart('tradesByDirection')}>
           <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Trades by Direction</h3>
           {filteredTrades.length > 0 ? (
             <div className="h-72">
@@ -652,7 +676,7 @@ export const Dashboard: React.FC = () => {
       {/* Line Charts Row: Balance History & Win Rate Over Time */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Balance History (Line Chart) */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors cursor-pointer" onClick={() => setExpandedChart('balanceHistory')}>
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors cursor-pointer" onClick={() => setExpandedChart('balanceHistory')}>
           <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Balance History</h3>
 
           {balanceHistory.length > 1 ? (
@@ -700,7 +724,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Win Rate Over Time (Line Chart) */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors cursor-pointer" onClick={() => setExpandedChart('winRateOverTime')}>
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors cursor-pointer" onClick={() => setExpandedChart('winRateOverTime')}>
           <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Win Rate Over Time</h3>
           {filteredTrades.length > 0 ? (
             <div className="h-72">
@@ -748,7 +772,7 @@ export const Dashboard: React.FC = () => {
       {/* Bar Charts Row: Days of Week Win Rate & Pairs with Highest Win Rate */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Days of Week Win Rate (Bar Chart) */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors">
           <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Days of Week Win Rate</h3>
           {winRateByDay.some(d => d.winRate > 0) ? (
             <div className="h-72">
@@ -771,7 +795,7 @@ export const Dashboard: React.FC = () => {
 
         {/* Pairs with Highest Win Rate (Bar Chart, all pairs only) */}
         {selectedPair === 'all' && (
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+          <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors">
             <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Pairs with Highest Win Rate</h3>
             {winRateByPair.length > 0 ? (
               <div className="h-96">
@@ -819,7 +843,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Average SL and TP by Pair (Bar Chart, all pairs only) */}
       {selectedPair === 'all' && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors">
           <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Average SL and TP (Pips) by Pair</h3>
           {avgSLTPByPair.length > 0 ? (
             <div className="h-96">
@@ -863,7 +887,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Total Profit/Loss by Pair (Bar Chart, full width, all pairs only) */}
       {selectedPair === 'all' && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+        <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors">
           <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-slate-100">Total Profit/Loss by Pair</h3>
           {profitLossByPair.length > 0 ? (
             <div className="h-96">

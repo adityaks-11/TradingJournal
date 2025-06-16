@@ -127,7 +127,7 @@ export const WithdrawalHistory: React.FC = () => {
 
   return (
     <>
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden transition-colors">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg overflow-hidden transition-colors">
         <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Withdrawal History</h2>
           <div className="flex gap-2">

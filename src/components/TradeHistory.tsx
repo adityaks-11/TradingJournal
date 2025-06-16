@@ -32,11 +32,13 @@ export const TradeHistory: React.FC = () => {
   // Filter state
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedPair, setSelectedPair] = useState('all');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('all'); // NEW
 
   // Export dialog state
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportMonth, setExportMonth] = useState(selectedMonth);
   const [exportPair, setExportPair] = useState(selectedPair);
+  const [exportTimeframe, setExportTimeframe] = useState(selectedTimeframe); // NEW
 
   useEffect(() => {
     fetchTrades();
@@ -62,12 +64,15 @@ export const TradeHistory: React.FC = () => {
 
   // Get all unique months from trades
   const months = Array.from(new Set(trades.map(trade => trade.date.slice(0, 7)))).sort().reverse();
+  // Get all unique timeframes from trades
+  const timeframes = Array.from(new Set(trades.map(trade => trade.timeframe))).sort();
 
-  // Filter trades by month and pair
+  // Filter trades by month, pair, and timeframe
   const filteredTrades = sortedTrades.filter(trade => {
     const monthMatch = selectedMonth === 'all' || trade.date.startsWith(selectedMonth);
     const pairMatch = selectedPair === 'all' || trade.pair === selectedPair;
-    return monthMatch && pairMatch;
+    const timeframeMatch = selectedTimeframe === 'all' || trade.timeframe === selectedTimeframe;
+    return monthMatch && pairMatch && timeframeMatch;
   });
 
   const handleDeleteClick = (tradeId: string) => {
@@ -122,10 +127,11 @@ export const TradeHistory: React.FC = () => {
     }
   };
 
-  // Export trades to CSV (filtered by exportMonth/exportPair)
+  // Export trades to CSV (filtered by exportMonth/exportPair/exportTimeframe)
   const handleExportCSV = () => {
     setExportMonth(selectedMonth);
     setExportPair(selectedPair);
+    setExportTimeframe(selectedTimeframe); // NEW
     setIsExportDialogOpen(true);
   };
 
@@ -134,7 +140,8 @@ export const TradeHistory: React.FC = () => {
     const tradesToExport = sortedTrades.filter(trade => {
       const monthMatch = exportMonth === 'all' || trade.date.startsWith(exportMonth);
       const pairMatch = exportPair === 'all' || trade.pair === exportPair;
-      return monthMatch && pairMatch;
+      const timeframeMatch = exportTimeframe === 'all' || trade.timeframe === exportTimeframe;
+      return monthMatch && pairMatch && timeframeMatch;
     });
     if (!tradesToExport.length) {
       setToast({ type: 'info', message: 'No trades to export for selected filters.', isVisible: true });
@@ -142,7 +149,7 @@ export const TradeHistory: React.FC = () => {
       return;
     }
     const headers = [
-      'Date', 'Pair', 'Direction', 'SL Pips', 'TP Pips', 'RR', 'Outcome', 'Result', 'Balance After', 'Image Link', 'Remarks'
+      'Date', 'Pair', 'Direction', 'SL Pips', 'TP Pips', 'RR', 'Outcome', 'Result', 'Timeframe', 'Image Link', 'Remarks'
     ];
     const rows = tradesToExport.map(trade => [
       trade.date,
@@ -153,7 +160,7 @@ export const TradeHistory: React.FC = () => {
       trade.riskRewardRatio,
       trade.outcome,
       trade.result,
-      trade.balanceAfterTrade,
+      trade.timeframe,
       trade.imageLink || '',
       trade.remarks || ''
     ]);
@@ -169,7 +176,8 @@ export const TradeHistory: React.FC = () => {
       } catch { monthLabel = exportMonth; }
     }
     let pairLabel = exportPair === 'all' ? 'AllPairs' : exportPair;
-    saveAs(blob, `trade_history_${monthLabel}_${pairLabel}.csv`);
+    let timeframeLabel = exportTimeframe === 'all' ? 'AllTimeframes' : exportTimeframe.replace(/\s/g, '');
+    saveAs(blob, `trade_history_${monthLabel}_${pairLabel}_${timeframeLabel}.csv`);
     setIsExportDialogOpen(false);
   };
 
@@ -212,7 +220,7 @@ export const TradeHistory: React.FC = () => {
 
   return (
     <>
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg overflow-hidden transition-colors">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg overflow-hidden transition-colors">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Trading History</h2>
           <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-center">
@@ -236,6 +244,16 @@ export const TradeHistory: React.FC = () => {
                 <option key={pair} value={pair}>{pair}</option>
               ))}
             </select>
+            <select
+              value={selectedTimeframe}
+              onChange={e => setSelectedTimeframe(e.target.value)}
+              className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">All Timeframes</option>
+              {timeframes.map(tf => (
+                <option key={tf} value={tf}>{tf}</option>
+              ))}
+            </select>
             <button
               className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md font-medium transition-colors"
               onClick={handleExportCSV}
@@ -257,7 +275,7 @@ export const TradeHistory: React.FC = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-slate-100 dark:bg-slate-700 transition-colors">
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300 cursor-pointer select-none flex items-center gap-1"
+                <th className="pl-8 pr-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300 cursor-pointer select-none flex items-center gap-1"
                     onClick={() => {
                       if (sortBy === 'date') setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
                       else { setSortBy('date'); setSortOrder('desc'); }
@@ -273,6 +291,7 @@ export const TradeHistory: React.FC = () => {
                   </span>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Pair</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Timeframe</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Direction</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">SL/TP (Pips)</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">RR</th>
@@ -292,7 +311,6 @@ export const TradeHistory: React.FC = () => {
                     )}
                   </span>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Balance After</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Image</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Remarks</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Actions</th>
@@ -301,8 +319,9 @@ export const TradeHistory: React.FC = () => {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {filteredTrades.map((trade) => (
                 <tr key={trade.id} className="hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 transition-colors">
-                  <td className="px-4 py-3 text-sm">{format(parseISO(trade.date), 'MMM dd, yyyy')}</td>
+                  <td className="pl-8 pr-4 py-3 text-sm">{format(parseISO(trade.date), 'MMM dd, yyyy')}</td>
                   <td className="px-4 py-3 text-sm">{trade.pair}</td>
+                  <td className="px-4 py-3 text-sm">{trade.timeframe}</td>
                   <td className="px-4 py-3">
                     <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
                       trade.direction === 'long'
@@ -341,7 +360,6 @@ export const TradeHistory: React.FC = () => {
                   }`}>
                     {trade.result > 0 ? '+' : ''}{trade.result.toFixed(2)}
                   </td>
-                  <td className="px-4 py-3 text-sm">${trade.balanceAfterTrade.toFixed(2)}</td>
                   <td className="px-4 py-3 text-sm">
                     {trade.imageLink ? (
                       <a
@@ -410,15 +428,15 @@ export const TradeHistory: React.FC = () => {
         onClose={closeToast}
       />
 
-      {/* Export Dialog */}
+      {/* Export Modal */}
       <Modal isOpen={isExportDialogOpen} onClose={() => setIsExportDialogOpen(false)} title="Export to CSV" size="sm">
         <div className="flex flex-col gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Month</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Month</label>
             <select
               value={exportMonth}
               onChange={e => setExportMonth(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               <option value="all">All Time</option>
               {months.map(month => (
@@ -427,11 +445,11 @@ export const TradeHistory: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Pair</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Pair</label>
             <select
               value={exportPair}
               onChange={e => setExportPair(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               <option value="all">All Pairs</option>
               {PAIRS.filter(p => p !== 'all').map(pair => (
@@ -439,8 +457,21 @@ export const TradeHistory: React.FC = () => {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Timeframe</label>
+            <select
+              value={exportTimeframe}
+              onChange={e => setExportTimeframe(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">All Timeframes</option>
+              {timeframes.map(tf => (
+                <option key={tf} value={tf}>{tf}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex justify-end gap-2 mt-2">
-            <button className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-md" onClick={() => setIsExportDialogOpen(false)}>Cancel</button>
+            <button className="px-4 py-2 bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-md font-medium" onClick={() => setIsExportDialogOpen(false)}>Cancel</button>
             <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md font-medium" onClick={doExportCSV}>Export</button>
           </div>
         </div>

@@ -35,6 +35,7 @@ export const CalendarPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [selectedPair, setSelectedPair] = useState('all');
+  const [selectedTimeframe, setSelectedTimeframe] = useState('all'); // NEW
   const { trades, fetchTrades } = useTradeStore();
   const { withdrawals, fetchWithdrawals } = useWithdrawalStore();
   const { user } = useAuthStore();
@@ -57,10 +58,16 @@ export const CalendarPage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showMonthPicker]);
 
-  // Filter trades and withdrawals for the selected month and pair
+  // Get unique timeframes from trades
+  const allTimeframes = Array.from(new Set(trades.map(t => t.timeframe)));
+  allTimeframes.sort();
+
+  // Filter trades and withdrawals for the selected month, pair, and timeframe
   const monthStr = format(selectedDate, 'yyyy-MM');
   const tradesThisMonth = trades.filter(trade =>
-    trade.date.startsWith(monthStr) && (selectedPair === 'all' || trade.pair === selectedPair)
+    trade.date.startsWith(monthStr) &&
+    (selectedPair === 'all' || trade.pair === selectedPair) &&
+    (selectedTimeframe === 'all' || trade.timeframe === selectedTimeframe)
   );
   const withdrawalsThisMonth = withdrawals.filter(w => w.date.startsWith(monthStr));
 
@@ -73,11 +80,15 @@ export const CalendarPage: React.FC = () => {
   const avgTrade = totalCount > 0 ? totalPL / totalCount : 0;
   const roiPercent = user && user.startingBalance ? ((totalPL / user.startingBalance) * 100).toFixed(2) : '0.00';
 
-  // Group trades by date (YYYY-MM-DD) and sum P&L and count trades for selected pair
+  // Group trades by date (YYYY-MM-DD) and sum P&L and count trades for selected pair and timeframe
   const dailyPL: Record<string, number> = {};
   const dailyCount: Record<string, number> = {};
   trades.forEach(trade => {
-    if (trade.date.startsWith(monthStr) && (selectedPair === 'all' || trade.pair === selectedPair)) {
+    if (
+      trade.date.startsWith(monthStr) &&
+      (selectedPair === 'all' || trade.pair === selectedPair) &&
+      (selectedTimeframe === 'all' || trade.timeframe === selectedTimeframe)
+    ) {
       const day = trade.date.slice(0, 10); // YYYY-MM-DD
       dailyPL[day] = (dailyPL[day] || 0) + trade.result;
       dailyCount[day] = (dailyCount[day] || 0) + 1;
@@ -142,7 +153,7 @@ export const CalendarPage: React.FC = () => {
               </h2>
               <button onClick={handleNextMonth} className="text-2xl px-2">&#8594;</button>
             </div>
-            <div>
+            <div className="flex items-center space-x-4">
               <select
                 value={selectedPair}
                 onChange={e => setSelectedPair(e.target.value)}
@@ -150,6 +161,16 @@ export const CalendarPage: React.FC = () => {
               >
                 {PAIRS.map(pair => (
                   <option key={pair} value={pair}>{pair === 'all' ? 'All Pairs' : pair}</option>
+                ))}
+              </select>
+              <select
+                value={selectedTimeframe}
+                onChange={e => setSelectedTimeframe(e.target.value)}
+                className="px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="all">All Timeframes</option>
+                {allTimeframes.map(tf => (
+                  <option key={tf} value={tf}>{tf}</option>
                 ))}
               </select>
             </div>
@@ -193,7 +214,7 @@ export const CalendarPage: React.FC = () => {
             </div>
           </div>
           {/* Calendar */}
-          <div className="w-full max-w-5xl bg-slate-100 dark:bg-slate-900 rounded-lg shadow p-0 overflow-hidden">
+          <div className="w-full max-w-5xl bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow p-0 overflow-hidden">
             <div className="grid grid-cols-7 border-t border-l border-slate-300 dark:border-slate-700">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
                 <div key={d} className="text-center font-semibold text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-800 border-b border-r border-slate-300 dark:border-slate-700 py-2">

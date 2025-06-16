@@ -20,7 +20,7 @@ export interface Trade {
   riskRewardRatio: number;
   outcome: TradeOutcome;
   result: number;
-  balanceAfterTrade: number;
+  timeframe: string; // was balanceAfterTrade
   imageLink?: string;
   remarks?: string;
 }

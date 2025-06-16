@@ -38,7 +38,7 @@ export const WithdrawalForm: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+    <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors">
       <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Withdraw Funds</h2>
 
       <div className="mb-4 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg transition-colors">

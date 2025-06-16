@@ -20,7 +20,12 @@ interface TradeFormData {
   result: number;
   imageLink?: string;
   remarks?: string;
+  timeframe: string; // Added timeframe
 }
+
+const TIMEFRAME_OPTIONS = [
+  "1 day", "4hr", "1hr", "30mins", "15mins", "5 mins", "1 min"
+];
 
 export const TradeForm: React.FC = () => {
   const { addTrade, isLoading, error } = useTradeStore();
@@ -34,6 +39,8 @@ export const TradeForm: React.FC = () => {
       riskRewardRatio: 2.00,
       riskPercent: 1,
       lotSize: 1,
+      timeframe: '4hr', // Default timeframe is now 4hr
+      session: 'Overlap', // Default session is now Overlap
     }
   });
 
@@ -46,6 +53,7 @@ export const TradeForm: React.FC = () => {
   const tpPips = watch('tpPips');
   const lotSize = watch('lotSize');
   const result = watch('result');
+  const timeframe = watch('timeframe');
 
   // Pip value lookup
   const pipValueMap: Record<string, number> = {
@@ -121,19 +129,7 @@ export const TradeForm: React.FC = () => {
 
   // Ensure riskRewardRatio resets to 2.00 on form reset
   const onSubmit = async (data: TradeFormData) => {
-    await addTrade(
-      data.date,
-      data.pair,
-      data.session,
-      data.direction,
-      data.slPips,
-      data.tpPips,
-      data.riskRewardRatio,
-      data.outcome,
-      data.result,
-      data.imageLink,
-      data.remarks
-    );
+    await addTrade(data); // Pass the whole object, not individual fields
 
     // Reset form after successful submission
     if (!error) {
@@ -144,12 +140,14 @@ export const TradeForm: React.FC = () => {
         riskRewardRatio: 2.00,
         riskPercent: 1,
         lotSize: 1,
+        timeframe: '4hr', // Reset to default timeframe
+        session: 'Overlap', // Reset to default session
       });
     }
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 transition-colors">
+    <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors">
       <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Add New Trade</h2>
 
       <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -218,6 +216,31 @@ export const TradeForm: React.FC = () => {
           )}
         </div>
 
+        {/* Timeframe (button group, single row, full width, modern) */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">
+            Timeframe <span className="text-red-500">*</span>
+          </label>
+          <div className="flex w-full gap-2">
+            {TIMEFRAME_OPTIONS.map(opt => (
+              <button
+                type="button"
+                key={opt}
+                className={`flex-1 px-0 py-2 rounded-md border text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500
+                  ${timeframe === opt
+                    ? 'bg-teal-600 text-white border-teal-700 dark:bg-teal-500 dark:text-slate-900 dark:border-teal-400 shadow-md'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600 hover:bg-teal-100 dark:hover:bg-teal-800'}
+                `}
+                style={{ minWidth: 0, minHeight: 36, fontSize: 14, letterSpacing: 0.5 }}
+                onClick={() => setValue('timeframe', opt, { shouldValidate: true })}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+          {errors.timeframe && <p className="mt-1 text-sm text-red-400">Timeframe is required</p>}
+        </div>
+
         {/* Direction */}
         <div>
           <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Direction</label>
@@ -269,13 +292,7 @@ export const TradeForm: React.FC = () => {
             step="0.1"
             placeholder="20"
             className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 transition-colors"
-            {...register('slPips', {
-              required: 'SL pips is required',
-              min: {
-                value: 0.1,
-                message: 'SL pips must be greater than 0'
-              }
-            })}
+            {...register('slPips', { required: 'SL pips is required' })}
           />
           {errors.slPips && (
             <p className="mt-1 text-sm text-red-400">{errors.slPips.message}</p>
@@ -297,14 +314,11 @@ export const TradeForm: React.FC = () => {
               required: 'TP pips is required',
               min: {
                 value: 0.1,
-                message: 'TP pips must be greater than 0'
+                message: '' // Remove error message
               }
             })}
             readOnly
           />
-          {errors.tpPips && (
-            <p className="mt-1 text-sm text-red-400">{errors.tpPips.message}</p>
-          )}
         </div>
 
         {/* Risk Reward Ratio */}
@@ -357,10 +371,7 @@ export const TradeForm: React.FC = () => {
             step="0.01"
             placeholder="1.00"
             className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 transition-colors"
-            {...register('lotSize', {
-              required: 'Lot size is required',
-              min: { value: 0.01, message: 'Lot size must be at least 0.01' }
-            })}
+            {...register('lotSize', { required: 'Lot size is required', min: { value: 0.01, message: '' } })}
             onChange={handleLotSizeChange}
             onBlur={handleLotSizeBlur}
           />
