@@ -8,10 +8,12 @@ import { Toast, ToastType } from './ui/Toast';
 import { useAuthStore } from '../store/authStore';
 import { saveAs } from 'file-saver';
 import { Modal } from './ui/Modal';
+import { useStrategyStore } from '../store/strategyStore';
 
 export const TradeHistory: React.FC = () => {
   const { trades, fetchTrades, deleteTrade, isLoading, error, deleteAllTrades } = useTradeStore();
   const { user, updateBalance } = useAuthStore();
+  const { strategies, fetchStrategies } = useStrategyStore();
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [tradeToDelete, setTradeToDelete] = useState<string | null>(null);
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
@@ -32,17 +34,25 @@ export const TradeHistory: React.FC = () => {
   // Filter state
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedPair, setSelectedPair] = useState('all');
-  const [selectedTimeframe, setSelectedTimeframe] = useState('all'); // NEW
+  const [selectedTimeframe, setSelectedTimeframe] = useState('all');
+  const [selectedAccount, setSelectedAccount] = useState<'Live' | 'Backtest' | 'all'>('all'); // Default to all accounts
+  const [selectedStrategy, setSelectedStrategy] = useState('all'); // NEW
 
   // Export dialog state
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportMonth, setExportMonth] = useState(selectedMonth);
   const [exportPair, setExportPair] = useState(selectedPair);
   const [exportTimeframe, setExportTimeframe] = useState(selectedTimeframe); // NEW
+  const [exportAccount, setExportAccount] = useState<'Live' | 'Backtest' | 'all'>(selectedAccount); // NEW
+  const [exportStrategy, setExportStrategy] = useState<string>(selectedStrategy); // NEW
 
   useEffect(() => {
     fetchTrades();
   }, [fetchTrades]);
+
+  useEffect(() => {
+    fetchStrategies();
+  }, [fetchStrategies]);
 
   // Always reset to latest date first on mount
   useEffect(() => {
@@ -67,12 +77,14 @@ export const TradeHistory: React.FC = () => {
   // Get all unique timeframes from trades
   const timeframes = Array.from(new Set(trades.map(trade => trade.timeframe))).sort();
 
-  // Filter trades by month, pair, and timeframe
+  // Filter trades by month, pair, timeframe, account, and strategy
   const filteredTrades = sortedTrades.filter(trade => {
     const monthMatch = selectedMonth === 'all' || trade.date.startsWith(selectedMonth);
     const pairMatch = selectedPair === 'all' || trade.pair === selectedPair;
     const timeframeMatch = selectedTimeframe === 'all' || trade.timeframe === selectedTimeframe;
-    return monthMatch && pairMatch && timeframeMatch;
+    const accountMatch = selectedAccount === 'all' || trade.account === selectedAccount;
+    const strategyMatch = selectedStrategy === 'all' || trade.strategy_name === selectedStrategy;
+    return monthMatch && pairMatch && timeframeMatch && accountMatch && strategyMatch;
   });
 
   const handleDeleteClick = (tradeId: string) => {
@@ -131,7 +143,9 @@ export const TradeHistory: React.FC = () => {
   const handleExportCSV = () => {
     setExportMonth(selectedMonth);
     setExportPair(selectedPair);
-    setExportTimeframe(selectedTimeframe); // NEW
+    setExportTimeframe(selectedTimeframe);
+    setExportAccount(selectedAccount); // NEW
+    setExportStrategy(selectedStrategy); // NEW
     setIsExportDialogOpen(true);
   };
 
@@ -141,7 +155,9 @@ export const TradeHistory: React.FC = () => {
       const monthMatch = exportMonth === 'all' || trade.date.startsWith(exportMonth);
       const pairMatch = exportPair === 'all' || trade.pair === exportPair;
       const timeframeMatch = exportTimeframe === 'all' || trade.timeframe === exportTimeframe;
-      return monthMatch && pairMatch && timeframeMatch;
+      const accountMatch = exportAccount === 'all' || trade.account === exportAccount;
+      const strategyMatch = exportStrategy === 'all' || trade.strategy_name === exportStrategy;
+      return monthMatch && pairMatch && timeframeMatch && accountMatch && strategyMatch;
     });
     if (!tradesToExport.length) {
       setToast({ type: 'info', message: 'No trades to export for selected filters.', isVisible: true });
@@ -149,7 +165,7 @@ export const TradeHistory: React.FC = () => {
       return;
     }
     const headers = [
-      'Date', 'Pair', 'Direction', 'SL Pips', 'TP Pips', 'RR', 'Outcome', 'Result', 'Timeframe', 'Image Link', 'Remarks'
+      'Date', 'Pair', 'Direction', 'SL Pips', 'TP Pips', 'RR', 'Outcome', 'Result', 'Timeframe', 'Account', 'Strategy', 'Image Link', 'Remarks'
     ];
     const rows = tradesToExport.map(trade => [
       trade.date,
@@ -161,6 +177,8 @@ export const TradeHistory: React.FC = () => {
       trade.outcome,
       trade.result,
       trade.timeframe,
+      trade.account,
+      trade.strategy_name || '',
       trade.imageLink || '',
       trade.remarks || ''
     ]);
@@ -177,7 +195,9 @@ export const TradeHistory: React.FC = () => {
     }
     let pairLabel = exportPair === 'all' ? 'AllPairs' : exportPair;
     let timeframeLabel = exportTimeframe === 'all' ? 'AllTimeframes' : exportTimeframe.replace(/\s/g, '');
-    saveAs(blob, `trade_history_${monthLabel}_${pairLabel}_${timeframeLabel}.csv`);
+    let accountLabel = exportAccount === 'all' ? 'AllAccounts' : exportAccount;
+    let strategyLabel = exportStrategy === 'all' ? 'AllStrategies' : exportStrategy.replace(/\s/g, '');
+    saveAs(blob, `trade_history_${monthLabel}_${pairLabel}_${timeframeLabel}_${accountLabel}_${strategyLabel}.csv`);
     setIsExportDialogOpen(false);
   };
 
@@ -224,6 +244,7 @@ export const TradeHistory: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-6 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Trading History</h2>
           <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-center">
+            {/* Month Filter */}
             <select
               value={selectedMonth}
               onChange={e => setSelectedMonth(e.target.value)}
@@ -234,6 +255,7 @@ export const TradeHistory: React.FC = () => {
                 <option key={month} value={month}>{format(parseISO(month + '-01'), 'MMMM yyyy')}</option>
               ))}
             </select>
+            {/* Pair Filter */}
             <select
               value={selectedPair}
               onChange={e => setSelectedPair(e.target.value)}
@@ -244,6 +266,7 @@ export const TradeHistory: React.FC = () => {
                 <option key={pair} value={pair}>{pair}</option>
               ))}
             </select>
+            {/* Timeframe Filter */}
             <select
               value={selectedTimeframe}
               onChange={e => setSelectedTimeframe(e.target.value)}
@@ -252,6 +275,27 @@ export const TradeHistory: React.FC = () => {
               <option value="all">All Timeframes</option>
               {timeframes.map(tf => (
                 <option key={tf} value={tf}>{tf}</option>
+              ))}
+            </select>
+            {/* Account Filter */}
+            <select
+              value={selectedAccount}
+              onChange={e => setSelectedAccount(e.target.value as 'Live' | 'Backtest' | 'all')}
+              className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="Live">Live</option>
+              <option value="Backtest">Backtest</option>
+              <option value="all">All Accounts</option>
+            </select>
+            {/* Strategy Filter */}
+            <select
+              value={selectedStrategy}
+              onChange={e => setSelectedStrategy(e.target.value)}
+              className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">All Strategies</option>
+              {strategies.map(s => (
+                <option key={s.id} value={s.name}>{s.name}</option>
               ))}
             </select>
             <button
@@ -311,6 +355,8 @@ export const TradeHistory: React.FC = () => {
                     )}
                   </span>
                 </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Account</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Strategy</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Image</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Remarks</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300">Actions</th>
@@ -360,6 +406,8 @@ export const TradeHistory: React.FC = () => {
                   }`}>
                     {trade.result > 0 ? '+' : ''}{trade.result.toFixed(2)}
                   </td>
+                  <td className="px-4 py-3 text-sm">{trade.account}</td>
+                  <td className="px-4 py-3 text-sm">{trade.strategy_name || '—'}</td>
                   <td className="px-4 py-3 text-sm">
                     {trade.imageLink ? (
                       <a
@@ -467,6 +515,31 @@ export const TradeHistory: React.FC = () => {
               <option value="all">All Timeframes</option>
               {timeframes.map(tf => (
                 <option key={tf} value={tf}>{tf}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Account</label>
+            <select
+              value={exportAccount}
+              onChange={e => setExportAccount(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">All Accounts</option>
+              <option value="Live">Live</option>
+              <option value="Backtest">Backtest</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Strategy</label>
+            <select
+              value={exportStrategy}
+              onChange={e => setExportStrategy(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="all">All Strategies</option>
+              {strategies.map(s => (
+                <option key={s.id} value={s.name}>{s.name}</option>
               ))}
             </select>
           </div>

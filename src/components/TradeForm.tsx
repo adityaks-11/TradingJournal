@@ -2,6 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useTradeStore } from '../store/tradeStore';
 import { useAuthStore } from '../store/authStore';
+import { useStrategyStore } from '../store/strategyStore';
 import { format } from 'date-fns';
 import { TradeDirection, TradeOutcome } from '../types';
 import { TrendingUp, TrendingDown } from 'lucide-react';
@@ -21,6 +22,8 @@ interface TradeFormData {
   imageLink?: string;
   remarks?: string;
   timeframe: string; // Added timeframe
+  account: string; // 'Live' or 'Backtest'
+  strategy: string; // strategy id
 }
 
 const TIMEFRAME_OPTIONS = [
@@ -30,6 +33,13 @@ const TIMEFRAME_OPTIONS = [
 export const TradeForm: React.FC = () => {
   const { addTrade, isLoading, error } = useTradeStore();
   const { user } = useAuthStore();
+  const { strategies, fetchStrategies } = useStrategyStore();
+  const [accountType, setAccountType] = React.useState<'Live' | 'Backtest'>('Live');
+  const [selectedStrategy, setSelectedStrategy] = React.useState<string>('');
+
+  React.useEffect(() => {
+    fetchStrategies();
+  }, [fetchStrategies]);
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<TradeFormData>({
     defaultValues: {
@@ -129,7 +139,15 @@ export const TradeForm: React.FC = () => {
 
   // Ensure riskRewardRatio resets to 2.00 on form reset
   const onSubmit = async (data: TradeFormData) => {
-    await addTrade(data); // Pass the whole object, not individual fields
+    // Find the selected strategy's name
+    const selectedStrategyObj = strategies.find(s => s.id === selectedStrategy);
+    const strategyName = selectedStrategyObj ? selectedStrategyObj.name : '';
+    await addTrade({
+      ...data,
+      account: accountType,
+      strategy: selectedStrategy, // keep for type compatibility, but not used in DB
+      strategy_name: strategyName, // this is what gets saved in DB
+    });
 
     // Reset form after successful submission
     if (!error) {
@@ -149,6 +167,29 @@ export const TradeForm: React.FC = () => {
   return (
     <div className="bg-gradient-to-br from-white via-slate-50 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg shadow-lg p-6 transition-colors">
       <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Add New Trade</h2>
+
+      {/* Account and Strategy fields in one row */}
+      <div className="flex flex-row gap-4 mb-4">
+        {/* Account Type Selector */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Account</label>
+          <div className="flex gap-2">
+            <button type="button" className={`px-4 py-2 rounded-md border font-semibold transition-colors ${accountType === 'Live' ? 'bg-teal-600 text-white border-teal-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600'}`} onClick={() => setAccountType('Live')}>Live</button>
+            <button type="button" className={`px-4 py-2 rounded-md border font-semibold transition-colors ${accountType === 'Backtest' ? 'bg-teal-600 text-white border-teal-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600'}`} onClick={() => setAccountType('Backtest')}>Backtest</button>
+          </div>
+        </div>
+
+        {/* Strategy Dropdown */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Strategy</label>
+          <select className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 transition-colors" value={selectedStrategy} onChange={e => setSelectedStrategy(e.target.value)} required>
+            <option value="">Select a strategy</option>
+            {strategies.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Date */}

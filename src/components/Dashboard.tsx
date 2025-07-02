@@ -6,6 +6,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { format, parseISO, getDay } from 'date-fns';
 import { Pencil, Calendar } from 'lucide-react';
 import { EditStartingBalanceModal } from './EditStartingBalanceModal';
+import { useStrategyStore } from '../store/strategyStore';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
@@ -20,6 +21,7 @@ export const Dashboard: React.FC = () => {
   const { user } = useAuthStore();
   const { trades, fetchTrades } = useTradeStore();
   const { withdrawals, fetchWithdrawals } = useWithdrawalStore();
+  const { strategies, fetchStrategies } = useStrategyStore();
   const [balanceHistory, setBalanceHistory] = useState<Array<{ date: string; balance: number }>>([]);
 
   // State for edit starting balance modal
@@ -37,6 +39,12 @@ export const Dashboard: React.FC = () => {
   // Add state for selectedTimeframe
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>('all');
 
+  // Add state for selectedAccount
+  const [selectedAccount, setSelectedAccount] = useState<'Live' | 'Backtest' | 'all'>('all');
+
+  // Add state for selectedStrategy
+  const [selectedStrategy, setSelectedStrategy] = useState('all');
+
   // Modal state for expanded chart
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
 
@@ -53,7 +61,8 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchTrades();
     fetchWithdrawals();
-  }, [fetchTrades, fetchWithdrawals]);
+    fetchStrategies();
+  }, [fetchTrades, fetchWithdrawals, fetchStrategies]);
 
   useEffect(() => {
     if (user && trades.length > 0) {
@@ -105,15 +114,17 @@ export const Dashboard: React.FC = () => {
     return true;
   };
 
-  // Filter trades and withdrawals by date, pair, and timeframe
+  // Filter trades and withdrawals by date, pair, timeframe, account, and strategy
   const filteredTrades = React.useMemo(() => {
     return trades.filter(trade => {
       const inDateRange = isWithinRange(trade.date);
       const inPair = selectedPair === 'all' ? true : trade.pair === selectedPair;
       const inTimeframe = selectedTimeframe === 'all' ? true : trade.timeframe === selectedTimeframe;
-      return inDateRange && inPair && inTimeframe;
+      const inAccount = selectedAccount === 'all' ? true : trade.account === selectedAccount;
+      const inStrategy = selectedStrategy === 'all' ? true : trade.strategy_name === selectedStrategy;
+      return inDateRange && inPair && inTimeframe && inAccount && inStrategy;
     });
-  }, [trades, selectedPair, selectedTimeframe, dateRange]);
+  }, [trades, selectedPair, selectedTimeframe, dateRange, selectedAccount, selectedStrategy]);
 
   const filteredWithdrawals = React.useMemo(() => {
     return withdrawals.filter(w => {
@@ -382,6 +393,33 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
         </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="accountSelector" className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Account</label>
+          <select
+            id="accountSelector"
+            value={selectedAccount}
+            onChange={e => setSelectedAccount(e.target.value as 'Live' | 'Backtest' | 'all')}
+            className="px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 transition-colors"
+          >
+            <option value="all">All Accounts</option>
+            <option value="Live">Live</option>
+            <option value="Backtest">Backtest</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="strategySelector" className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Strategy</label>
+          <select
+            id="strategySelector"
+            value={selectedStrategy}
+            onChange={e => setSelectedStrategy(e.target.value)}
+            className="px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 transition-colors"
+          >
+            <option value="all">All Strategies</option>
+            {strategies.map(s => (
+              <option key={s.id} value={s.name}>{s.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );
@@ -428,6 +466,35 @@ export const Dashboard: React.FC = () => {
           <option value="all">All Pairs</option>
           {PAIRS.map(pair => (
             <option key={pair} value={pair}>{pair}</option>
+          ))}
+        </select>
+        <select
+          value={selectedTimeframe}
+          onChange={e => setSelectedTimeframe(e.target.value)}
+          className="px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 transition-colors"
+        >
+          <option value="all">All Timeframes</option>
+          {allTimeframes.map(tf => (
+            <option key={tf} value={tf}>{tf}</option>
+          ))}
+        </select>
+        <select
+          value={selectedAccount}
+          onChange={e => setSelectedAccount(e.target.value as 'Live' | 'Backtest' | 'all')}
+          className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+        >
+          <option value="all">All Accounts</option>
+          <option value="Live">Live</option>
+          <option value="Backtest">Backtest</option>
+        </select>
+        <select
+          value={selectedStrategy}
+          onChange={e => setSelectedStrategy(e.target.value)}
+          className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+        >
+          <option value="all">All Strategies</option>
+          {strategies.map(s => (
+            <option key={s.id} value={s.name}>{s.name}</option>
           ))}
         </select>
       </div>
@@ -603,6 +670,37 @@ export const Dashboard: React.FC = () => {
             <option value="all">All Timeframes</option>
             {allTimeframes.filter(tf => tf !== 'all').map(tf => (
               <option key={tf} value={tf}>{tf}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Account Selector (new) */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="accountSelector" className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Account</label>
+          <select
+            id="accountSelector"
+            value={selectedAccount}
+            onChange={e => setSelectedAccount(e.target.value as 'Live' | 'Backtest' | 'all')}
+            className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            <option value="all">All Accounts</option>
+            <option value="Live">Live</option>
+            <option value="Backtest">Backtest</option>
+          </select>
+        </div>
+
+        {/* Strategy Selector (new) */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="strategySelector" className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Strategy</label>
+          <select
+            id="strategySelector"
+            value={selectedStrategy}
+            onChange={e => setSelectedStrategy(e.target.value)}
+            className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            <option value="all">All Strategies</option>
+            {strategies.map(s => (
+              <option key={s.id} value={s.name}>{s.name}</option>
             ))}
           </select>
         </div>

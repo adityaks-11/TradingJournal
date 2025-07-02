@@ -23,6 +23,9 @@ export interface Trade {
   timeframe: string; // was balanceAfterTrade
   imageLink?: string;
   remarks?: string;
+  account: string; // 'Live' or 'Backtest'
+  strategy?: string; // strategy id, optional
+  strategy_name?: string; // Add this for compatibility with the DB column
 }
 
 export interface Withdrawal {

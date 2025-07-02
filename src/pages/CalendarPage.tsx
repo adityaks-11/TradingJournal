@@ -4,6 +4,7 @@ import { Navbar } from '../components/Navbar';
 import { useTradeStore } from '../store/tradeStore';
 import { useWithdrawalStore } from '../store/withdrawalStore';
 import { useAuthStore } from '../store/authStore';
+import { useStrategyStore } from '../store/strategyStore';
 
 const getMonthMatrix = (date: Date) => {
   const startMonth = startOfMonth(date);
@@ -36,15 +37,19 @@ export const CalendarPage: React.FC = () => {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [selectedPair, setSelectedPair] = useState('all');
   const [selectedTimeframe, setSelectedTimeframe] = useState('all'); // NEW
+  const [selectedAccount, setSelectedAccount] = useState<'Live' | 'Backtest' | 'all'>('all');
+  const [selectedStrategy, setSelectedStrategy] = useState('all');
   const { trades, fetchTrades } = useTradeStore();
   const { withdrawals, fetchWithdrawals } = useWithdrawalStore();
   const { user } = useAuthStore();
+  const { strategies, fetchStrategies } = useStrategyStore();
   const monthPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchTrades();
     fetchWithdrawals();
-  }, [fetchTrades, fetchWithdrawals]);
+    fetchStrategies();
+  }, [fetchTrades, fetchWithdrawals, fetchStrategies]);
 
   // Close month picker on outside click
   useEffect(() => {
@@ -62,12 +67,14 @@ export const CalendarPage: React.FC = () => {
   const allTimeframes = Array.from(new Set(trades.map(t => t.timeframe)));
   allTimeframes.sort();
 
-  // Filter trades and withdrawals for the selected month, pair, and timeframe
+  // Filter trades and withdrawals for the selected month, pair, timeframe, account, and strategy
   const monthStr = format(selectedDate, 'yyyy-MM');
   const tradesThisMonth = trades.filter(trade =>
     trade.date.startsWith(monthStr) &&
     (selectedPair === 'all' || trade.pair === selectedPair) &&
-    (selectedTimeframe === 'all' || trade.timeframe === selectedTimeframe)
+    (selectedTimeframe === 'all' || trade.timeframe === selectedTimeframe) &&
+    (selectedAccount === 'all' || trade.account === selectedAccount) &&
+    (selectedStrategy === 'all' || trade.strategy_name === selectedStrategy)
   );
   const withdrawalsThisMonth = withdrawals.filter(w => w.date.startsWith(monthStr));
 
@@ -87,7 +94,9 @@ export const CalendarPage: React.FC = () => {
     if (
       trade.date.startsWith(monthStr) &&
       (selectedPair === 'all' || trade.pair === selectedPair) &&
-      (selectedTimeframe === 'all' || trade.timeframe === selectedTimeframe)
+      (selectedTimeframe === 'all' || trade.timeframe === selectedTimeframe) &&
+      (selectedAccount === 'all' || trade.account === selectedAccount) &&
+      (selectedStrategy === 'all' || trade.strategy_name === selectedStrategy)
     ) {
       const day = trade.date.slice(0, 10); // YYYY-MM-DD
       dailyPL[day] = (dailyPL[day] || 0) + trade.result;
@@ -171,6 +180,25 @@ export const CalendarPage: React.FC = () => {
                 <option value="all">All Timeframes</option>
                 {allTimeframes.map(tf => (
                   <option key={tf} value={tf}>{tf}</option>
+                ))}
+              </select>
+              <select
+                value={selectedAccount}
+                onChange={e => setSelectedAccount(e.target.value as 'Live' | 'Backtest' | 'all')}
+                className="px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="all">All Accounts</option>
+                <option value="Live">Live</option>
+                <option value="Backtest">Backtest</option>
+              </select>
+              <select
+                value={selectedStrategy}
+                onChange={e => setSelectedStrategy(e.target.value)}
+                className="px-4 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="all">All Strategies</option>
+                {strategies.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
                 ))}
               </select>
             </div>

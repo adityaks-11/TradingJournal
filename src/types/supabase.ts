@@ -49,6 +49,8 @@ export interface Database {
           balance_after_trade: number
           image_link: string | null
           remarks: string | null
+          account: string // 'Live' or 'Backtest'
+          strategy: string // strategy id
         }
         Insert: {
           id?: string
@@ -66,6 +68,8 @@ export interface Database {
           balance_after_trade: number
           image_link?: string | null
           remarks?: string | null
+          account: string
+          strategy: string
         }
         Update: {
           id?: string
@@ -83,6 +87,8 @@ export interface Database {
           balance_after_trade?: number
           image_link?: string | null
           remarks?: string | null
+          account?: string
+          strategy?: string
         }
       }
       withdrawals: {
